@@ -1,19 +1,20 @@
 import os
 import traceback
 import tkinter as tk
-from tkinter import filedialog, messagebox
+from tkinter import filedialog, messagebox, ttk
 from tkinter.scrolledtext import ScrolledText
 
 from comparator import ExcelComparator
 
 
-# Все строки интерфейса вынесены в переменные для удобной локализации.
 UI_TEXT = {
     "title": "Сравнение Excel: Транспортные средства",
+    "header": "Excel Compare Tool",
+    "subheader": "Сравнение списков ТС по гос. номеру или VIN",
     "select_old": "Выбрать старый файл",
     "select_new": "Выбрать новый файл",
-    "compare": "▶ СРАВНИТЬ",
-    "save_report": "💾 Сохранить отчёт",
+    "compare": "Сравнить",
+    "save_report": "Сохранить отчёт",
     "status_ready": "Готово. Выберите файлы для сравнения.",
     "status_old_selected": "Старый файл выбран.",
     "status_new_selected": "Новый файл выбран.",
@@ -35,72 +36,189 @@ UI_TEXT = {
 }
 
 
+COLORS = {
+    "bg": "#F3F4F6",
+    "card": "#FFFFFF",
+    "muted": "#6B7280",
+    "text": "#111827",
+    "accent": "#2563EB",
+    "accent_hover": "#1D4ED8",
+    "line": "#E5E7EB",
+    "ok": "#16A34A",
+}
+
+
 class ExcelCompareApp:
-    """Главный класс GUI-приложения."""
+    """Современный интерфейс в стиле Windows 11 на ttk/tkinter."""
 
     def __init__(self, root: tk.Tk):
         self.root = root
         self.root.title(UI_TEXT["title"])
-        self.root.geometry("900x600")
-        self.root.minsize(760, 520)
+        self.root.geometry("980x680")
+        self.root.minsize(820, 560)
+        self.root.configure(bg=COLORS["bg"])
 
         self.comparator = ExcelComparator()
         self.old_file_path = ""
         self.new_file_path = ""
         self.last_report = ""
 
+        self.status_var = tk.StringVar(value=UI_TEXT["status_ready"])
+        self._busy = False
+        self._setup_styles()
         self._create_widgets()
 
+    def _setup_styles(self):
+        style = ttk.Style(self.root)
+        style.theme_use("clam")
+
+        style.configure("Card.TFrame", background=COLORS["card"], relief="flat")
+        style.configure("Header.TLabel", background=COLORS["bg"], foreground=COLORS["text"], font=("Segoe UI", 18, "bold"))
+        style.configure("SubHeader.TLabel", background=COLORS["bg"], foreground=COLORS["muted"], font=("Segoe UI", 10))
+        style.configure("Muted.TLabel", background=COLORS["card"], foreground=COLORS["muted"], font=("Segoe UI", 9))
+        style.configure("File.TLabel", background=COLORS["card"], foreground=COLORS["text"], font=("Segoe UI", 10))
+        style.configure("Status.TLabel", background=COLORS["bg"], foreground=COLORS["muted"], font=("Segoe UI", 9))
+        style.configure("Line.TFrame", background=COLORS["line"])
+        style.configure("TProgressbar", troughcolor=COLORS["line"], background=COLORS["accent"], bordercolor=COLORS["line"], lightcolor=COLORS["accent"], darkcolor=COLORS["accent"])
+
     def _create_widgets(self):
-        top_frame = tk.Frame(self.root, padx=12, pady=10)
-        top_frame.pack(fill=tk.X)
+        root_pad = tk.Frame(self.root, bg=COLORS["bg"])
+        root_pad.pack(fill=tk.BOTH, expand=True, padx=20, pady=16)
 
-        self.btn_old = tk.Button(top_frame, text=UI_TEXT["select_old"], command=self.select_old_file, width=24)
-        self.btn_old.grid(row=0, column=0, padx=(0, 8), pady=5, sticky="w")
+        ttk.Label(root_pad, text=UI_TEXT["header"], style="Header.TLabel").pack(anchor="w")
+        ttk.Label(root_pad, text=UI_TEXT["subheader"], style="SubHeader.TLabel").pack(anchor="w", pady=(2, 14))
 
-        self.lbl_old = tk.Label(top_frame, text="—", anchor="w")
-        self.lbl_old.grid(row=0, column=1, padx=4, pady=5, sticky="we")
+        card = ttk.Frame(root_pad, style="Card.TFrame", padding=16)
+        card.pack(fill=tk.BOTH, expand=True)
 
-        self.btn_new = tk.Button(top_frame, text=UI_TEXT["select_new"], command=self.select_new_file, width=24)
-        self.btn_new.grid(row=1, column=0, padx=(0, 8), pady=5, sticky="w")
+        top_grid = ttk.Frame(card, style="Card.TFrame")
+        top_grid.pack(fill=tk.X)
+        top_grid.columnconfigure(1, weight=1)
 
-        self.lbl_new = tk.Label(top_frame, text="—", anchor="w")
-        self.lbl_new.grid(row=1, column=1, padx=4, pady=5, sticky="we")
+        self.btn_old = tk.Button(
+            top_grid,
+            text=UI_TEXT["select_old"],
+            command=self.select_old_file,
+            bg=COLORS["card"],
+            fg=COLORS["text"],
+            activebackground="#EEF2FF",
+            activeforeground=COLORS["text"],
+            relief="flat",
+            bd=0,
+            padx=14,
+            pady=8,
+            font=("Segoe UI", 10),
+            cursor="hand2",
+        )
+        self.btn_old.grid(row=0, column=0, padx=(0, 12), pady=(0, 10), sticky="w")
+        self._bind_hover(self.btn_old, COLORS["card"], "#EEF2FF")
 
-        top_frame.columnconfigure(1, weight=1)
+        self.lbl_old = ttk.Label(top_grid, text="Файл не выбран", style="File.TLabel")
+        self.lbl_old.grid(row=0, column=1, sticky="we", pady=(0, 10))
 
-        action_frame = tk.Frame(self.root, padx=12, pady=4)
-        action_frame.pack(fill=tk.X)
+        self.btn_new = tk.Button(
+            top_grid,
+            text=UI_TEXT["select_new"],
+            command=self.select_new_file,
+            bg=COLORS["card"],
+            fg=COLORS["text"],
+            activebackground="#EEF2FF",
+            activeforeground=COLORS["text"],
+            relief="flat",
+            bd=0,
+            padx=14,
+            pady=8,
+            font=("Segoe UI", 10),
+            cursor="hand2",
+        )
+        self.btn_new.grid(row=1, column=0, padx=(0, 12), pady=(0, 8), sticky="w")
+        self._bind_hover(self.btn_new, COLORS["card"], "#EEF2FF")
+
+        self.lbl_new = ttk.Label(top_grid, text="Файл не выбран", style="File.TLabel")
+        self.lbl_new.grid(row=1, column=1, sticky="we", pady=(0, 8))
+
+        ttk.Frame(card, style="Line.TFrame", height=1).pack(fill=tk.X, pady=(8, 12))
+
+        action_row = ttk.Frame(card, style="Card.TFrame")
+        action_row.pack(fill=tk.X, pady=(0, 8))
 
         self.btn_compare = tk.Button(
-            action_frame,
-            text=UI_TEXT["compare"],
+            action_row,
+            text=f"▶ {UI_TEXT['compare']}",
             command=self.compare_files,
+            bg=COLORS["accent"],
+            fg="white",
+            activebackground=COLORS["accent_hover"],
+            activeforeground="white",
+            relief="flat",
+            bd=0,
+            padx=16,
+            pady=9,
             font=("Segoe UI", 10, "bold"),
-            width=18,
+            cursor="hand2",
         )
-        self.btn_compare.pack(side=tk.LEFT, padx=(0, 8))
+        self.btn_compare.pack(side=tk.LEFT, padx=(0, 10))
+        self._bind_hover(self.btn_compare, COLORS["accent"], COLORS["accent_hover"])
 
-        self.btn_save = tk.Button(action_frame, text=UI_TEXT["save_report"], command=self.save_report, width=18)
+        self.btn_save = tk.Button(
+            action_row,
+            text=f"💾 {UI_TEXT['save_report']}",
+            command=self.save_report,
+            bg=COLORS["card"],
+            fg=COLORS["text"],
+            activebackground="#EEF2FF",
+            activeforeground=COLORS["text"],
+            relief="flat",
+            bd=0,
+            padx=14,
+            pady=9,
+            font=("Segoe UI", 10),
+            cursor="hand2",
+        )
         self.btn_save.pack(side=tk.LEFT)
+        self._bind_hover(self.btn_save, COLORS["card"], "#EEF2FF")
 
-        self.output = ScrolledText(self.root, wrap=tk.WORD, font=("Consolas", 10))
-        self.output.pack(fill=tk.BOTH, expand=True, padx=12, pady=8)
+        self.progress = ttk.Progressbar(card, mode="indeterminate", length=160)
+        self.progress.pack(fill=tk.X, pady=(2, 10))
+        self.progress.stop()
 
-        self.status_var = tk.StringVar(value=UI_TEXT["status_ready"])
-        self.status_bar = tk.Label(
-            self.root,
-            textvariable=self.status_var,
-            bd=1,
-            relief=tk.SUNKEN,
-            anchor="w",
-            padx=8,
-            pady=4,
+        output_frame = tk.Frame(card, bg=COLORS["line"], bd=0, highlightthickness=0)
+        output_frame.pack(fill=tk.BOTH, expand=True, pady=(4, 10))
+
+        self.output = ScrolledText(
+            output_frame,
+            wrap=tk.WORD,
+            font=("Consolas", 10),
+            bg="#FAFAFB",
+            fg=COLORS["text"],
+            bd=0,
+            padx=10,
+            pady=10,
+            insertbackground=COLORS["text"],
         )
-        self.status_bar.pack(fill=tk.X, side=tk.BOTTOM)
+        self.output.pack(fill=tk.BOTH, expand=True, padx=1, pady=1)
+
+        status_row = ttk.Frame(root_pad, style="Card.TFrame")
+        status_row.pack(fill=tk.X, pady=(8, 0))
+        ttk.Label(status_row, textvariable=self.status_var, style="Status.TLabel").pack(side=tk.LEFT, anchor="w")
+
+    @staticmethod
+    def _bind_hover(button: tk.Button, normal: str, hover: str):
+        button.bind("<Enter>", lambda _: button.config(bg=hover))
+        button.bind("<Leave>", lambda _: button.config(bg=normal))
+
+    def _set_busy(self, is_busy: bool):
+        self._busy = is_busy
+        state = tk.DISABLED if is_busy else tk.NORMAL
+        self.btn_compare.config(state=state)
+        self.btn_old.config(state=state)
+        self.btn_new.config(state=state)
+        if is_busy:
+            self.progress.start(10)
+        else:
+            self.progress.stop()
 
     def set_status(self, text: str):
-        """Обновляет текст в статус-баре."""
         self.status_var.set(text)
         self.root.update_idletasks()
 
@@ -179,6 +297,7 @@ class ExcelCompareApp:
             return
 
         try:
+            self._set_busy(True)
             self.set_status(UI_TEXT["status_compare_start"])
 
             old_df = self.comparator.load_file(self.old_file_path)
@@ -209,6 +328,8 @@ class ExcelCompareApp:
                 f"Произошла непредвиденная ошибка:\n{exc}\n\n{traceback.format_exc()}",
             )
             self.set_status(UI_TEXT["status_error"])
+        finally:
+            self._set_busy(False)
 
     def save_report(self):
         if not self.last_report.strip():
