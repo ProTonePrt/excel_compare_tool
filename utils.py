@@ -42,12 +42,42 @@ def find_plate_column(df: pd.DataFrame) -> Optional[str]:
 
     normalized_keywords = [normalize_text(item) for item in COLUMN_KEYWORDS]
 
+    # 1) Сначала ищем по названию колонки.
     for col in df.columns:
         col_norm = normalize_text(col)
         for keyword in normalized_keywords:
             # Поддерживаем как точное совпадение, так и вхождение.
             if col_norm == keyword or keyword in col_norm:
                 return col
+
+    # 2) Если по названию не нашли, пробуем определить по содержимому.
+    # Это помогает, когда шапка нестандартная: "ТС", "ID", "Колонка 5" и т.д.
+    best_col = None
+    best_score = 0
+
+    for col in df.columns:
+        series = df[col].dropna()
+        if series.empty:
+            continue
+
+        # Ограничиваем объём анализа для скорости.
+        sample = series.head(80).tolist()
+        valid_count = 0
+
+        for value in sample:
+            normalized = normalize_plate(value)
+            # Валидный идентификатор и в нём есть хотя бы одна цифра.
+            if normalized and any(ch.isdigit() for ch in normalized):
+                valid_count += 1
+
+        if valid_count > best_score:
+            best_score = valid_count
+            best_col = col
+
+    # Порог, чтобы не схватить случайный текстовый столбец.
+    if best_col is not None and best_score >= 3:
+        return best_col
+
     return None
 
 
