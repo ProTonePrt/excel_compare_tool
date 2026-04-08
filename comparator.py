@@ -9,6 +9,19 @@ from utils import find_plate_column, normalize_plate
 class ExcelComparator:
     """Класс для загрузки и сравнения Excel-файлов."""
 
+    @staticmethod
+    def _to_sorted_strings(values) -> list:
+        """
+        Безопасно приводит значения к строкам и сортирует.
+        Защищает от смешанных типов (str/float и т.д.).
+        """
+        prepared = []
+        for item in values:
+            if item is None:
+                continue
+            prepared.append(str(item))
+        return sorted(prepared)
+
     def load_file(self, path: str) -> pd.DataFrame:
         """Загружает Excel-файл в DataFrame с проверкой типовых ошибок."""
         file_path = Path(path)
@@ -52,20 +65,19 @@ class ExcelComparator:
                 "Проверьте названия столбцов, например: 'Гос номер', 'VIN', 'Рег. номер'."
             )
 
-        old_set = {
-            normalized
-            for normalized in old_df[selected_old_col].apply(normalize_plate).tolist()
-            if normalized
-        }
-        new_set = {
-            normalized
-            for normalized in new_df[selected_new_col].apply(normalize_plate).tolist()
-            if normalized
-        }
+        old_set = set()
+        for normalized in old_df[selected_old_col].apply(normalize_plate).tolist():
+            if normalized:
+                old_set.add(str(normalized))
 
-        added = sorted(new_set - old_set)
-        removed = sorted(old_set - new_set)
-        unchanged = sorted(old_set & new_set)
+        new_set = set()
+        for normalized in new_df[selected_new_col].apply(normalize_plate).tolist():
+            if normalized:
+                new_set.add(str(normalized))
+
+        added = self._to_sorted_strings(new_set - old_set)
+        removed = self._to_sorted_strings(old_set - new_set)
+        unchanged = self._to_sorted_strings(old_set & new_set)
 
         return {
             "col_old": selected_old_col,
