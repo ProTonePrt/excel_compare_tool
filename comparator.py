@@ -65,13 +65,26 @@ class ExcelComparator:
                 {"path": str(file_path), "sheetNames": sheet_names, "sheetCount": int(len(sheet_names))},
             )
             # endregion
-            df = pd.read_excel(file_path)
+            selected_sheet = sheet_names[-1] if sheet_names else 0
+            # region agent log
+            _debug_log(
+                "H6",
+                "comparator.py:load_file",
+                "Selected sheet for loading",
+                {"path": str(file_path), "selectedSheet": str(selected_sheet)},
+            )
+            # endregion
+            df = pd.read_excel(file_path, sheet_name=selected_sheet)
             # region agent log
             _debug_log(
                 "H6",
                 "comparator.py:load_file",
                 "Loaded default sheet",
-                {"path": str(file_path), "shape": [int(df.shape[0]), int(df.shape[1])]},
+                {
+                    "path": str(file_path),
+                    "shape": [int(df.shape[0]), int(df.shape[1])],
+                    "loadedSheet": str(selected_sheet),
+                },
             )
             # endregion
         except PermissionError as exc:
