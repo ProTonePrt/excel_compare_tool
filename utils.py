@@ -66,8 +66,9 @@ def find_plate_column(df: pd.DataFrame) -> Optional[str]:
 
         for value in sample:
             normalized = normalize_plate(value)
-            # Валидный идентификатор и в нём есть хотя бы одна цифра.
-            if normalized and any(ch.isdigit() for ch in normalized):
+            # Валидный идентификатор и в нём есть хотя бы одна цифра и буква.
+            # Это отсекает колонки типа "дата", "сумма", "номер документа" (часто только цифры).
+            if normalized and any(ch.isdigit() for ch in normalized) and any(ch.isalpha() for ch in normalized):
                 valid_count += 1
 
         if valid_count > best_score:

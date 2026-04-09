@@ -256,6 +256,7 @@ class ExcelCompareApp:
             f"Старый файл: {old_name}",
             f"Новый файл: {new_name}",
             f"Найдено колонок: \"{result['col_old']}\" → \"{result['col_new']}\"",
+            f"Нормализовано ID: старый={result.get('old_total_valid', 0)}, новый={result.get('new_total_valid', 0)}",
             f"✅ Без изменений: {unchanged_count} ТС",
         ]
 
