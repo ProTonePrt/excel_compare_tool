@@ -3,6 +3,8 @@ from typing import Dict, Optional
 import json
 import time
 import uuid
+from collections import Counter
+import hashlib
 
 import pandas as pd
 
@@ -124,6 +126,30 @@ class ExcelComparator:
                 "newUnique": int(len(new_set)),
                 "oldSample": list(sorted(old_set))[:5],
                 "newSample": list(sorted(new_set))[:5],
+            },
+        )
+        old_counter = Counter(old_df[selected_old_col].apply(normalize_plate).dropna().astype(str).tolist())
+        new_counter = Counter(new_df[selected_new_col].apply(normalize_plate).dropna().astype(str).tolist())
+        old_fingerprint = hashlib.sha256("|".join(sorted(old_counter.elements())).encode("utf-8")).hexdigest()
+        new_fingerprint = hashlib.sha256("|".join(sorted(new_counter.elements())).encode("utf-8")).hexdigest()
+        changed_counts = []
+        all_keys = set(old_counter.keys()) | set(new_counter.keys())
+        for key in sorted(all_keys):
+            if old_counter.get(key, 0) != new_counter.get(key, 0):
+                changed_counts.append(
+                    {"id": key, "oldCount": int(old_counter.get(key, 0)), "newCount": int(new_counter.get(key, 0))}
+                )
+            if len(changed_counts) >= 5:
+                break
+        _debug_log(
+            "H5",
+            "comparator.py:compare",
+            "Multiset diagnostics",
+            {
+                "oldFingerprint": old_fingerprint,
+                "newFingerprint": new_fingerprint,
+                "sameFingerprint": old_fingerprint == new_fingerprint,
+                "topCountChanges": changed_counts,
             },
         )
 
