@@ -55,7 +55,25 @@ class ExcelComparator:
             raise FileNotFoundError(f"Файл не найден: {path}")
 
         try:
+            xls = pd.ExcelFile(file_path)
+            sheet_names = [str(name) for name in xls.sheet_names]
+            # region agent log
+            _debug_log(
+                "H6",
+                "comparator.py:load_file",
+                "Workbook sheet list",
+                {"path": str(file_path), "sheetNames": sheet_names, "sheetCount": int(len(sheet_names))},
+            )
+            # endregion
             df = pd.read_excel(file_path)
+            # region agent log
+            _debug_log(
+                "H6",
+                "comparator.py:load_file",
+                "Loaded default sheet",
+                {"path": str(file_path), "shape": [int(df.shape[0]), int(df.shape[1])]},
+            )
+            # endregion
         except PermissionError as exc:
             raise PermissionError("Не удалось открыть файл. Закройте файл в Excel и повторите.") from exc
         except ValueError as exc:
