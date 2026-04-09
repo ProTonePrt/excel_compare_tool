@@ -1,4 +1,7 @@
 import re
+import json
+import time
+import uuid
 from typing import Optional
 
 import pandas as pd
@@ -24,6 +27,26 @@ COLUMN_KEYWORDS = [
     "registration",
 ]
 
+DEBUG_LOG_PATH = "debug-fff107.log"
+DEBUG_SESSION_ID = "fff107"
+
+
+def _debug_log(hypothesis_id: str, location: str, message: str, data: dict):
+    # region agent log
+    payload = {
+        "sessionId": DEBUG_SESSION_ID,
+        "runId": "initial",
+        "hypothesisId": hypothesis_id,
+        "location": location,
+        "message": message,
+        "data": data,
+        "timestamp": int(time.time() * 1000),
+        "id": f"log_{int(time.time() * 1000)}_{uuid.uuid4().hex[:8]}",
+    }
+    with open(DEBUG_LOG_PATH, "a", encoding="utf-8") as fh:
+        fh.write(json.dumps(payload, ensure_ascii=False) + "\n")
+    # endregion
+
 
 def normalize_text(value: str) -> str:
     """Нормализует название колонки для более устойчивого сравнения."""
@@ -38,9 +61,16 @@ def find_plate_column(df: pd.DataFrame) -> Optional[str]:
     Возвращает исходное имя колонки или None.
     """
     if df is None:
+        _debug_log("H1", "utils.py:find_plate_column", "DataFrame is None", {})
         return None
 
     normalized_keywords = [normalize_text(item) for item in COLUMN_KEYWORDS]
+    _debug_log(
+        "H1",
+        "utils.py:find_plate_column",
+        "Start column detection",
+        {"columns": [str(c) for c in df.columns.tolist()], "rowCount": int(len(df))},
+    )
 
     # 1) Сначала ищем по названию колонки.
     for col in df.columns:
@@ -48,6 +78,12 @@ def find_plate_column(df: pd.DataFrame) -> Optional[str]:
         for keyword in normalized_keywords:
             # Поддерживаем как точное совпадение, так и вхождение.
             if col_norm == keyword or keyword in col_norm:
+                _debug_log(
+                    "H1",
+                    "utils.py:find_plate_column",
+                    "Column matched by header",
+                    {"column": str(col), "normalizedColumn": col_norm, "keyword": keyword},
+                )
                 return col
 
     # 2) Если по названию не нашли, пробуем определить по содержимому.
@@ -77,8 +113,15 @@ def find_plate_column(df: pd.DataFrame) -> Optional[str]:
 
     # Порог, чтобы не схватить случайный текстовый столбец.
     if best_col is not None and best_score >= 3:
+        _debug_log(
+            "H1",
+            "utils.py:find_plate_column",
+            "Column matched by content fallback",
+            {"column": str(best_col), "score": int(best_score)},
+        )
         return best_col
 
+    _debug_log("H1", "utils.py:find_plate_column", "Column not found", {"bestScore": int(best_score)})
     return None
 
 

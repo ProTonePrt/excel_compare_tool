@@ -1,9 +1,32 @@
 from pathlib import Path
 from typing import Dict, Optional
+import json
+import time
+import uuid
 
 import pandas as pd
 
 from utils import find_plate_column, normalize_plate
+
+DEBUG_LOG_PATH = "debug-fff107.log"
+DEBUG_SESSION_ID = "fff107"
+
+
+def _debug_log(hypothesis_id: str, location: str, message: str, data: dict):
+    # region agent log
+    payload = {
+        "sessionId": DEBUG_SESSION_ID,
+        "runId": "initial",
+        "hypothesisId": hypothesis_id,
+        "location": location,
+        "message": message,
+        "data": data,
+        "timestamp": int(time.time() * 1000),
+        "id": f"log_{int(time.time() * 1000)}_{uuid.uuid4().hex[:8]}",
+    }
+    with open(DEBUG_LOG_PATH, "a", encoding="utf-8") as fh:
+        fh.write(json.dumps(payload, ensure_ascii=False) + "\n")
+    # endregion
 
 
 class ExcelComparator:
@@ -58,6 +81,17 @@ class ExcelComparator:
         """
         selected_old_col = col_old or find_plate_column(old_df)
         selected_new_col = col_new or find_plate_column(new_df)
+        _debug_log(
+            "H1",
+            "comparator.py:compare",
+            "Selected columns",
+            {
+                "selectedOldCol": str(selected_old_col) if selected_old_col else None,
+                "selectedNewCol": str(selected_new_col) if selected_new_col else None,
+                "oldRows": int(len(old_df)),
+                "newRows": int(len(new_df)),
+            },
+        )
 
         if not selected_old_col or not selected_new_col:
             raise ValueError(
@@ -66,18 +100,48 @@ class ExcelComparator:
             )
 
         old_set = set()
+        old_non_empty = 0
         for normalized in old_df[selected_old_col].apply(normalize_plate).tolist():
             if normalized:
+                old_non_empty += 1
                 old_set.add(str(normalized))
 
         new_set = set()
+        new_non_empty = 0
         for normalized in new_df[selected_new_col].apply(normalize_plate).tolist():
             if normalized:
+                new_non_empty += 1
                 new_set.add(str(normalized))
+
+        _debug_log(
+            "H2",
+            "comparator.py:compare",
+            "Normalized stats",
+            {
+                "oldNonEmptyCount": int(old_non_empty),
+                "newNonEmptyCount": int(new_non_empty),
+                "oldUnique": int(len(old_set)),
+                "newUnique": int(len(new_set)),
+                "oldSample": list(sorted(old_set))[:5],
+                "newSample": list(sorted(new_set))[:5],
+            },
+        )
 
         added = self._to_sorted_strings(new_set - old_set)
         removed = self._to_sorted_strings(old_set - new_set)
         unchanged = self._to_sorted_strings(old_set & new_set)
+        _debug_log(
+            "H3",
+            "comparator.py:compare",
+            "Diff result",
+            {
+                "addedCount": int(len(added)),
+                "removedCount": int(len(removed)),
+                "unchangedCount": int(len(unchanged)),
+                "addedSample": added[:5],
+                "removedSample": removed[:5],
+            },
+        )
 
         return {
             "col_old": selected_old_col,

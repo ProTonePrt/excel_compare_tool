@@ -3,6 +3,9 @@ import traceback
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 from tkinter.scrolledtext import ScrolledText
+import json
+import time
+import uuid
 
 from comparator import ExcelComparator
 
@@ -46,6 +49,26 @@ COLORS = {
     "line": "#E5E7EB",
     "ok": "#16A34A",
 }
+
+DEBUG_LOG_PATH = "debug-fff107.log"
+DEBUG_SESSION_ID = "fff107"
+
+
+def _debug_log(hypothesis_id: str, location: str, message: str, data: dict):
+    # region agent log
+    payload = {
+        "sessionId": DEBUG_SESSION_ID,
+        "runId": "initial",
+        "hypothesisId": hypothesis_id,
+        "location": location,
+        "message": message,
+        "data": data,
+        "timestamp": int(time.time() * 1000),
+        "id": f"log_{int(time.time() * 1000)}_{uuid.uuid4().hex[:8]}",
+    }
+    with open(DEBUG_LOG_PATH, "a", encoding="utf-8") as fh:
+        fh.write(json.dumps(payload, ensure_ascii=False) + "\n")
+    # endregion
 
 
 class ExcelCompareApp:
@@ -300,6 +323,12 @@ class ExcelCompareApp:
         try:
             self._set_busy(True)
             self.set_status(UI_TEXT["status_compare_start"])
+            _debug_log(
+                "H4",
+                "main.py:compare_files",
+                "Compare started with file paths",
+                {"oldPath": self.old_file_path, "newPath": self.new_file_path, "samePath": self.old_file_path == self.new_file_path},
+            )
 
             old_df = self.comparator.load_file(self.old_file_path)
             new_df = self.comparator.load_file(self.new_file_path)
